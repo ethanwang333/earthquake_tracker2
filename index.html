@@ -91,8 +91,8 @@ fetch(dataUrl)
           mapbox: { style: 'open-street-map', center: {lat:0, lon:0}, zoom:1 },
           margin: { t:0, b:100, l:0, r:0 },  // increase bottom margin so slider labels fit
           sliders:[{
-              pad: {t:80, b:10, l:100, r:0},  // increase left padding, allow right to extend
-              currentvalue: {prefix: "Date: "},
+              pad: {t:80, b:10, l:150, r:0},  // much more left padding to prevent cutoff
+              currentvalue: {prefix: "Date: ", xanchor: 'left', x: 0.15},  // shift current value display
               steps: sortedDates.map(dateStr => ({
                   label: dateStr,
                   method: 'animate',
