@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Earthquake Map</title>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<div id="map" style="width:100%;height:90vh;"></div>
+
+<script>
+// --- Put your SAS URL here ---
+const dataUrl = "https://earthquakestorage123.blob.core.windows.net/bronze/latest_earthquake_data.json?sp=r&st=2025-12-07T17:19:27Z&se=2026-01-08T01:34:27Z&spr=https&sv=2024-11-04&sr=b&sig=7%2F0OtVDd5bllUbWMqVtQUls4vwcs%2BYna1fMaO0u8dLw%3D";
+
+// Fetch JSON data
+fetch(dataUrl)
+  .then(response => response.json())
+  .then(data => {
+      // Parse data for Plotly
+      const lats = data.map(d => d.geometry.coordinates[1]);
+      const lons = data.map(d => d.geometry.coordinates[0]);
+      const mags = data.map(d => d.properties.mag);
+      const titles = data.map(d => d.properties.title);
+      const times = data.map(d => new Date(d.properties.time));
+
+      // Bubble sizes (scaled)
+      const sizes = mags.map(m => (m ? m * 3 : 1));
+
+      // Hover text with wrapped title
+      const hoverTexts = titles.map((t, i) => 
+          t.length > 60 ? t.match(/.{1,60}/g).join("<br>") : t
+      );
+
+      const trace = {
+          type: 'scattermapbox',
+          lat: lats,
+          lon: lons,
+          mode: 'markers',
+          marker: {
+              size: sizes,
+              color: mags,
+              colorscale: 'Turbo',
+              cmin: 0,
+              cmax: 10,
+              opacity: 0.6
+          },
+          text: hoverTexts,
+          hoverinfo: 'text'
+      };
+
+      const layout = {
+          mapbox: {
+              style: 'open-street-map',
+              center: { lat: 0, lon: 0 },
+              zoom: 1
+          },
+          margin: { t:0, b:0, l:0, r:0 }
+      };
+
+      Plotly.newPlot('map', [trace], layout, {responsive: true});
+  })
+  .catch(err => console.error("Error loading JSON:", err));
+</script>
+</body>
+</html>
