@@ -89,9 +89,9 @@ fetch(dataUrl)
 
       const layout = {
           mapbox: { style: 'open-street-map', center: {lat:0, lon:0}, zoom:1 },
-          margin: { t:0, b:0, l:0, r:0 },
+          margin: { t:0, b:100, l:0, r:0 },  // increase bottom margin so slider labels fit
           sliders:[{
-              pad: {t:50},
+              pad: {t:80, b:10},  // more top padding so slider is visible
               currentvalue: {prefix: "Date: "},
               steps: sortedDates.map(dateStr => ({
                   label: dateStr,
@@ -101,12 +101,16 @@ fetch(dataUrl)
           }],
           updatemenus:[{
               type:'buttons',
+              y: 0.05,  // move buttons above bottom
+              x: 0.01,
+              xanchor: 'left',
+              yanchor: 'bottom',
               buttons:[{
-                  label:'Play',
+                  label:'\u25B6', // Play icon
                   method:'animate',
                   args:[null,{fromcurrent:true,frame:{duration:500, redraw:true},transition:{duration:0}}]
               },{
-                  label:'Pause',
+                  label:'\u275A\u275A', // Pause icon
                   method:'animate',
                   args:[[null],{mode:'immediate',frame:{duration:0,redraw:false},transition:{duration:0}}]
               }]
