@@ -3,7 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <title>Animated Earthquake Map</title>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+<style>
+    /* Extra space so slider labels NEVER get cut off */
+    #map {
+        margin-left: 50px;   /* prevents leftmost date from clipping */
+        margin-right: 20px;
+    }
+</style>
+
 </head>
 <body>
 <div id="map" style="width:100%;height:90vh;"></div>
@@ -16,7 +25,6 @@ fetch(dataUrl)
   .then(response => response.json())
   .then(features => {
 
-      // Group by date
       const df = {};
       features.forEach(f => {
           const dateStr = new Date(f.properties.time).toISOString().split('T')[0];
@@ -26,7 +34,6 @@ fetch(dataUrl)
 
       const sortedDates = Object.keys(df).sort();
 
-      // Create frames for each day
       const frames = sortedDates.map(dateStr => {
           const dayData = df[dateStr];
           return {
@@ -59,7 +66,6 @@ fetch(dataUrl)
           };
       });
 
-      // Initial trace for first frame
       const firstDayData = df[sortedDates[0]];
       const trace = {
           type: 'scattermapbox',
@@ -89,9 +95,15 @@ fetch(dataUrl)
 
       const layout = {
           mapbox: { style: 'open-street-map', center: {lat:0, lon:0}, zoom:1 },
-          margin: { t:0, b:100, l:0, r:0 },  // increase bottom margin so slider labels fit
+
+          /* --- FIX PART 1: Larger margins so slider never clips --- */
+          margin: { t:0, b:120, l:60, r:20 },
+
+          /* --- FIX PART 2: auto margin for safety --- */
+          xaxis: { automargin: true },
+
           sliders:[{
-              pad: {t:80, b:10},  // more top padding so slider is visible
+              pad: {t:90, b:20},
               currentvalue: {prefix: "Date: "},
               steps: sortedDates.map(dateStr => ({
                   label: dateStr,
@@ -99,21 +111,25 @@ fetch(dataUrl)
                   args: [[dateStr], {mode:'immediate',frame:{duration:500, redraw:true}, transition:{duration:0}}]
               }))
           }],
+
           updatemenus:[{
               type:'buttons',
-              y: 0.05,  // move buttons above bottom
+              y: 0.06,
               x: 0.01,
               xanchor: 'left',
               yanchor: 'bottom',
-              buttons:[{
-                  label:'\u25B6', // Play icon
-                  method:'animate',
-                  args:[null,{fromcurrent:true,frame:{duration:500, redraw:true},transition:{duration:0}}]
-              },{
-                  label:'\u275A\u275A', // Pause icon
-                  method:'animate',
-                  args:[[null],{mode:'immediate',frame:{duration:0,redraw:false},transition:{duration:0}}]
-              }]
+              buttons:[
+                  {
+                      label:'\u25B6', // Play triangle
+                      method:'animate',
+                      args:[null,{fromcurrent:true,frame:{duration:500, redraw:true},transition:{duration:0}}]
+                  },
+                  {
+                      label:'\u275A\u275A', // Pause bars
+                      method:'animate',
+                      args:[[null],{mode:'immediate',frame:{duration:0,redraw:false},transition:{duration:0}}]
+                  }
+              ]
           }]
       };
 
