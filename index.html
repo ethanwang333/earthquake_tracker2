@@ -3,57 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <title>Animated Earthquake Map</title>
-<script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
 <div id="map" style="width:100%;height:90vh;"></div>
 
 <script>
-const dataUrl = "https://earthquakestorage123.blob.core.windows.net/bronze/latest_earthquake_data.json?sp=r&st=2025-12-07T17:19:27Z&se=2026-01-08T01:34:27Z&spr=https&sv=2024-11-04&sr=b&sig=7%2F0OtVDd5bllUbWMqVtQUls4vwcs%2BYna1fMaO0u8dLw%3D";  // Latest earthquake JSON SAS URL
+// --- Put your latest JSON SAS URL here ---
+const dataUrl = "YOUR_SAS_URL_HERE";
 
 fetch(dataUrl)
   .then(response => response.json())
-  .then(json => {
-      const features = json;
+  .then(features => {
 
-      // Convert GeoJSON features to arrays
-      const lats = features.map(f => f.geometry.coordinates[1]);
-      const lons = features.map(f => f.geometry.coordinates[0]);
-      const mags = features.map(f => f.properties.mag);
-      const titles = features.map(f => f.properties.title);
-      const times = features.map(f => new Date(f.properties.time));
-
-      // Bubble sizes and colors
-      const sizes = mags.map(m => m ? m * 3 : 1);
-      const colors = mags.map(m => m);
-
-      // Wrap long hover text
-      const hoverTexts = titles.map((t,i) => {
-          const dateStr = times[i].toISOString().split('T')[0];
-          return (t.length>60 ? t.match(/.{1,60}/g).join("<br>") : t)
-                 + "<br><b>Date:</b> "+dateStr
-                 + "<br><b>Magnitude:</b> "+mags[i];
-      });
-
-      const trace = {
-          type: 'scattermapbox',
-          lat: lats,
-          lon: lons,
-          mode: 'markers',
-          marker: {
-              size: sizes,
-              color: colors,
-              colorscale: 'Turbo',
-              cmin: 0,
-              cmax: 10,
-              opacity: 0.6
-          },
-          text: hoverTexts,
-          hoverinfo: 'text',
-          // animation_frame: times is handled via grouping below
-      };
-
-      // Group by date for animation frames
+      // Group by date
       const df = {};
       features.forEach(f => {
           const dateStr = new Date(f.properties.time).toISOString().split('T')[0];
@@ -61,43 +24,87 @@ fetch(dataUrl)
           df[dateStr].push(f);
       });
 
-      const frames = Object.keys(df).sort().map(dateStr => {
-          const fset = df[dateStr];
+      const sortedDates = Object.keys(df).sort();
+
+      // Create frames for each day
+      const frames = sortedDates.map(dateStr => {
+          const dayData = df[dateStr];
           return {
               name: dateStr,
               data: [{
-                  type:'scattermapbox',
-                  lat: fset.map(d => d.geometry.coordinates[1]),
-                  lon: fset.map(d => d.geometry.coordinates[0]),
+                  type: 'scattermapbox',
+                  lat: dayData.map(d => d.geometry.coordinates[1]),
+                  lon: dayData.map(d => d.geometry.coordinates[0]),
                   mode: 'markers',
                   marker: {
-                      size: fset.map(d => d.properties.mag*3),
-                      color: fset.map(d => d.properties.mag),
-                      colorscale:'Turbo',
-                      cmin:0,
-                      cmax:10,
-                      opacity:0.6
+                      size: dayData.map(d => d.properties.mag * 3),
+                      color: dayData.map(d => d.properties.mag),
+                      colorscale: 'Turbo',
+                      cmin: 0,
+                      cmax: 10,
+                      opacity: 0.6,
+                      colorbar: {
+                          title: 'Magnitude',
+                          thickness: 15
+                      }
                   },
-                  text: fset.map(d => {
+                  text: dayData.map(d => {
                       const t = d.properties.title;
-                      return (t.length>60 ? t.match(/.{1,60}/g).join("<br>") : t)
+                      return (t.length > 60 ? t.match(/.{1,60}/g).join("<br>") : t)
                              + "<br><b>Date:</b> "+dateStr
                              + "<br><b>Magnitude:</b> "+d.properties.mag;
                   }),
-                  hoverinfo:'text'
+                  hoverinfo: 'text'
               }]
           };
       });
 
+      // Initial trace for first frame
+      const firstDayData = df[sortedDates[0]];
+      const trace = {
+          type: 'scattermapbox',
+          lat: firstDayData.map(d => d.geometry.coordinates[1]),
+          lon: firstDayData.map(d => d.geometry.coordinates[0]),
+          mode: 'markers',
+          marker: {
+              size: firstDayData.map(d => d.properties.mag * 3),
+              color: firstDayData.map(d => d.properties.mag),
+              colorscale: 'Turbo',
+              cmin: 0,
+              cmax: 10,
+              opacity: 0.6,
+              colorbar: {
+                  title: 'Magnitude',
+                  thickness: 15
+              }
+          },
+          text: firstDayData.map(d => {
+              const t = d.properties.title;
+              return (t.length > 60 ? t.match(/.{1,60}/g).join("<br>") : t)
+                     + "<br><b>Date:</b> "+sortedDates[0]
+                     + "<br><b>Magnitude:</b> "+d.properties.mag;
+          }),
+          hoverinfo: 'text'
+      };
+
       const layout = {
-          mapbox: { style: 'open-street-map', center:{lat:0,lon:0}, zoom:1 },
-          margin: {t:0,b:0,l:0,r:0},
+          mapbox: { style: 'open-street-map', center: {lat:0, lon:0}, zoom:1 },
+          margin: { t:0, b:0, l:0, r:0 },
+          sliders:[{
+              pad: {t:50},
+              currentvalue: {prefix: "Date: "},
+              steps: sortedDates.map(dateStr => ({
+                  label: dateStr,
+                  method: 'animate',
+                  args: [[dateStr], {mode:'immediate',frame:{duration:500, redraw:true}, transition:{duration:0}}]
+              }))
+          }],
           updatemenus:[{
               type:'buttons',
               buttons:[{
                   label:'Play',
                   method:'animate',
-                  args:[null,{fromcurrent:true,frame:{duration:500,redraw:true},transition:{duration:0}}]
+                  args:[null,{fromcurrent:true,frame:{duration:500, redraw:true},transition:{duration:0}}]
               },{
                   label:'Pause',
                   method:'animate',
@@ -106,7 +113,7 @@ fetch(dataUrl)
           }]
       };
 
-      Plotly.newPlot('map',[trace],layout,{responsive:true,scrollZoom:true});
+      Plotly.newPlot('map', [trace], layout, {responsive:true, scrollZoom:true});
       Plotly.addFrames('map', frames);
 
   })
