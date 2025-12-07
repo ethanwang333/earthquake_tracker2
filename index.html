@@ -2,34 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Earthquake Map</title>
+<title>Animated Earthquake Map</title>
 <script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
 </head>
 <body>
 <div id="map" style="width:100%;height:90vh;"></div>
 
 <script>
-// --- Put your SAS URL here ---
-const dataUrl = "https://earthquakestorage123.blob.core.windows.net/bronze/latest_earthquake_data.json?sp=r&st=2025-12-07T17:19:27Z&se=2026-01-08T01:34:27Z&spr=https&sv=2024-11-04&sr=b&sig=7%2F0OtVDd5bllUbWMqVtQUls4vwcs%2BYna1fMaO0u8dLw%3D";
+const dataUrl = "https://earthquakestorage123.blob.core.windows.net/bronze/latest_earthquake_data.json?sp=r&st=2025-12-07T17:19:27Z&se=2026-01-08T01:34:27Z&spr=https&sv=2024-11-04&sr=b&sig=7%2F0OtVDd5bllUbWMqVtQUls4vwcs%2BYna1fMaO0u8dLw%3D";  // Latest earthquake JSON SAS URL
 
-// Fetch JSON data
 fetch(dataUrl)
   .then(response => response.json())
-  .then(data => {
-      // Parse data for Plotly
-      const lats = data.map(d => d.geometry.coordinates[1]);
-      const lons = data.map(d => d.geometry.coordinates[0]);
-      const mags = data.map(d => d.properties.mag);
-      const titles = data.map(d => d.properties.title);
-      const times = data.map(d => new Date(d.properties.time));
+  .then(json => {
+      const features = json;
 
-      // Bubble sizes (scaled)
-      const sizes = mags.map(m => (m ? m * 3 : 1));
+      // Convert GeoJSON features to arrays
+      const lats = features.map(f => f.geometry.coordinates[1]);
+      const lons = features.map(f => f.geometry.coordinates[0]);
+      const mags = features.map(f => f.properties.mag);
+      const titles = features.map(f => f.properties.title);
+      const times = features.map(f => new Date(f.properties.time));
 
-      // Hover text with wrapped title
-      const hoverTexts = titles.map((t, i) => 
-          t.length > 60 ? t.match(/.{1,60}/g).join("<br>") : t
-      );
+      // Bubble sizes and colors
+      const sizes = mags.map(m => m ? m * 3 : 1);
+      const colors = mags.map(m => m);
+
+      // Wrap long hover text
+      const hoverTexts = titles.map((t,i) => {
+          const dateStr = times[i].toISOString().split('T')[0];
+          return (t.length>60 ? t.match(/.{1,60}/g).join("<br>") : t)
+                 + "<br><b>Date:</b> "+dateStr
+                 + "<br><b>Magnitude:</b> "+mags[i];
+      });
 
       const trace = {
           type: 'scattermapbox',
@@ -38,26 +42,73 @@ fetch(dataUrl)
           mode: 'markers',
           marker: {
               size: sizes,
-              color: mags,
+              color: colors,
               colorscale: 'Turbo',
               cmin: 0,
               cmax: 10,
               opacity: 0.6
           },
           text: hoverTexts,
-          hoverinfo: 'text'
+          hoverinfo: 'text',
+          // animation_frame: times is handled via grouping below
       };
+
+      // Group by date for animation frames
+      const df = {};
+      features.forEach(f => {
+          const dateStr = new Date(f.properties.time).toISOString().split('T')[0];
+          if(!df[dateStr]) df[dateStr] = [];
+          df[dateStr].push(f);
+      });
+
+      const frames = Object.keys(df).sort().map(dateStr => {
+          const fset = df[dateStr];
+          return {
+              name: dateStr,
+              data: [{
+                  type:'scattermapbox',
+                  lat: fset.map(d => d.geometry.coordinates[1]),
+                  lon: fset.map(d => d.geometry.coordinates[0]),
+                  mode: 'markers',
+                  marker: {
+                      size: fset.map(d => d.properties.mag*3),
+                      color: fset.map(d => d.properties.mag),
+                      colorscale:'Turbo',
+                      cmin:0,
+                      cmax:10,
+                      opacity:0.6
+                  },
+                  text: fset.map(d => {
+                      const t = d.properties.title;
+                      return (t.length>60 ? t.match(/.{1,60}/g).join("<br>") : t)
+                             + "<br><b>Date:</b> "+dateStr
+                             + "<br><b>Magnitude:</b> "+d.properties.mag;
+                  }),
+                  hoverinfo:'text'
+              }]
+          };
+      });
 
       const layout = {
-          mapbox: {
-              style: 'open-street-map',
-              center: { lat: 0, lon: 0 },
-              zoom: 1
-          },
-          margin: { t:0, b:0, l:0, r:0 }
+          mapbox: { style: 'open-street-map', center:{lat:0,lon:0}, zoom:1 },
+          margin: {t:0,b:0,l:0,r:0},
+          updatemenus:[{
+              type:'buttons',
+              buttons:[{
+                  label:'Play',
+                  method:'animate',
+                  args:[null,{fromcurrent:true,frame:{duration:500,redraw:true},transition:{duration:0}}]
+              },{
+                  label:'Pause',
+                  method:'animate',
+                  args:[[null],{mode:'immediate',frame:{duration:0,redraw:false},transition:{duration:0}}]
+              }]
+          }]
       };
 
-      Plotly.newPlot('map', [trace], layout, {responsive: true});
+      Plotly.newPlot('map',[trace],layout,{responsive:true,scrollZoom:true});
+      Plotly.addFrames('map', frames);
+
   })
   .catch(err => console.error("Error loading JSON:", err));
 </script>
